@@ -1,0 +1,24 @@
+/**/pure_pursuit_node:
+  ros__parameters:
+    # Minimum lookahead distance (m). Effective lookahead: L = lookahead_distance + k_v * v
+    lookahead_distance: 0.4
+    # Velocity-dependent lookahead gain. Higher = more lookahead at speed.
+    k_v: 0.3
+    # Max forward speed (m/s)
+    max_linear_velocity: 0.5
+    # Max turn rate (rad/s)
+    max_angular_velocity: 1.5
+    # Distance to last waypoint to declare goal reached (m)
+    goal_tolerance: 0.3
+    # Control loop rate (Hz)
+    control_frequency: 20.0
+    # Distance to goal at which speed starts tapering for smooth stopping (m)
+    adaptive_lookahead_distance: 2.0
+    # Heading error above which the robot stops and rotates in place (deg)
+    turn_in_place_threshold_deg: 60.0
+    # Heading error above which forward speed starts reducing (deg)
+    slow_down_threshold_deg: 30.0
+    # Exponential smoothing on angular velocity (0=no smoothing, 1=fully damped)
+    w_smoothing_alpha: 0.15
+    # Max lateral acceleration for curvature-based speed limiting (m/s^2)
+    max_lateral_acceleration: 0.3
