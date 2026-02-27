@@ -10,6 +10,7 @@
 #include <cmath>
 #include <vector>
 #include <fstream>
+#include <string>
 
 class PurePursuitNode : public rclcpp::Node
 {
@@ -49,6 +50,9 @@ private:
     bool odom_received_;
     bool path_received_;
     size_t last_closest_idx_;            // monotonic progress along path
+
+    // Frame ID derived from namespace (e.g. "RR03/odom")
+    std::string odom_frame_id_;
 
     // Parameters
     double lookahead_distance_;           // L_min

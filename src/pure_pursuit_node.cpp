@@ -9,6 +9,13 @@ PurePursuitNode::PurePursuitNode()
       last_closest_idx_(0),
       prev_w_command_(0.0)
 {
+    // Build odom frame ID from namespace (e.g. "/RR03" -> "RR03/odom")
+    {
+        std::string ns = this->get_namespace();
+        if (!ns.empty() && ns.front() == '/') ns = ns.substr(1);
+        odom_frame_id_ = ns.empty() ? "odom" : ns + "/odom";
+    }
+
     // Declare parameters with defaults
     this->declare_parameter("lookahead_distance", 0.8);
     this->declare_parameter("k_v", 0.5);
@@ -62,7 +69,7 @@ PurePursuitNode::PurePursuitNode()
         std::bind(&PurePursuitNode::controlCallback, this));
 
     // Initialize actual trajectory header
-    actual_trajectory_.header.frame_id = "odom";
+    actual_trajectory_.header.frame_id = odom_frame_id_;
 
     // Open CSV log file
     log_file_.open("/tmp/pure_pursuit_log.csv", std::ios::out | std::ios::trunc);
@@ -351,7 +358,7 @@ void PurePursuitNode::controlCallback()
     // Publish lookahead point (PointStamped, frame_id="odom")
     geometry_msgs::msg::PointStamped lookahead_msg;
     lookahead_msg.header.stamp = this->now();
-    lookahead_msg.header.frame_id = "odom";
+    lookahead_msg.header.frame_id = odom_frame_id_;
     lookahead_msg.point.x = lookahead_pos.x;
     lookahead_msg.point.y = lookahead_pos.y;
     lookahead_msg.point.z = lookahead_pos.z;
@@ -360,7 +367,7 @@ void PurePursuitNode::controlCallback()
     // Publish lookahead marker for RViz visualization (SPHERE, yellow rgba(1,1,0,0.8))
     visualization_msgs::msg::Marker marker;
     marker.header.stamp = this->now();
-    marker.header.frame_id = "odom";
+    marker.header.frame_id = odom_frame_id_;
     marker.ns = "lookahead";
     marker.id = 0;
     marker.type = visualization_msgs::msg::Marker::SPHERE;
@@ -424,7 +431,7 @@ void PurePursuitNode::controlCallback()
         {
             geometry_msgs::msg::PoseStamped pose_stamped;
             pose_stamped.header.stamp = this->now();
-            pose_stamped.header.frame_id = "odom";
+            pose_stamped.header.frame_id = odom_frame_id_;
             pose_stamped.pose = current_odom_.pose.pose;
             actual_trajectory_.poses.push_back(pose_stamped);
             actual_trajectory_.header.stamp = this->now();
@@ -558,7 +565,7 @@ void PurePursuitNode::controlCallback()
     {
         geometry_msgs::msg::PoseStamped pose_stamped;
         pose_stamped.header.stamp = this->now();
-        pose_stamped.header.frame_id = "odom";
+        pose_stamped.header.frame_id = odom_frame_id_;
         pose_stamped.pose = current_odom_.pose.pose;
         actual_trajectory_.poses.push_back(pose_stamped);
         actual_trajectory_.header.stamp = this->now();
