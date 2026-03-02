@@ -7,7 +7,7 @@
     # Max forward speed (m/s)
     max_linear_velocity: 0.5
     # Max turn rate (rad/s)
-    max_angular_velocity: 1.5
+    max_angular_velocity: 0.5
     # Distance to last waypoint to declare goal reached (m)
     goal_tolerance: 0.3
     # Control loop rate (Hz)
@@ -22,3 +22,5 @@
     w_smoothing_alpha: 0.15
     # Max lateral acceleration for curvature-based speed limiting (m/s^2)
     max_lateral_acceleration: 0.3
+    # Enable curvature-based speed limiting (reduces speed before corners)
+    enable_curvature_slowdown: false

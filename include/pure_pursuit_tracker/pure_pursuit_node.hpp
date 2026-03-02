@@ -66,6 +66,7 @@ private:
     double slow_down_threshold_;          // stored in radians
     double w_smoothing_alpha_;
     double max_lateral_acceleration_;
+    bool enable_curvature_slowdown_;
     double prev_w_command_;
 
     // CSV logging

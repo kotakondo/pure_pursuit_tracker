@@ -28,6 +28,7 @@ PurePursuitNode::PurePursuitNode()
     this->declare_parameter("slow_down_threshold_deg", 30.0);
     this->declare_parameter("w_smoothing_alpha", 0.3);
     this->declare_parameter("max_lateral_acceleration", 0.5);
+    this->declare_parameter("enable_curvature_slowdown", true);
 
     // Get parameters
     lookahead_distance_ = this->get_parameter("lookahead_distance").as_double();
@@ -41,6 +42,7 @@ PurePursuitNode::PurePursuitNode()
     slow_down_threshold_ = this->get_parameter("slow_down_threshold_deg").as_double() * M_PI / 180.0;
     w_smoothing_alpha_ = this->get_parameter("w_smoothing_alpha").as_double();
     max_lateral_acceleration_ = this->get_parameter("max_lateral_acceleration").as_double();
+    enable_curvature_slowdown_ = this->get_parameter("enable_curvature_slowdown").as_bool();
 
     // Subscribe to /reference_trajectory with QoS: reliable + transient_local (to match publisher)
     rclcpp::QoS path_qos(10);
@@ -343,8 +345,12 @@ void PurePursuitNode::controlCallback()
     double current_speed = std::abs(current_odom_.twist.twist.linear.x);
     double lookahead_dist = computeDynamicLookahead(current_speed);
 
-    // Adaptive lookahead: reduce lookahead distance when approaching goal for graceful stopping
-    if (dist_to_goal < adaptive_lookahead_distance_)
+    // Adaptive lookahead: reduce lookahead distance when approaching goal for graceful stopping.
+    // Only apply when past 80% of the path — otherwise on looping/self-intersecting trajectories
+    // (figure-8, line) the robot repeatedly passes near the final waypoint and gets its
+    // lookahead crushed every lap, causing oscillation or stalling.
+    if (closest_idx >= reference_path_.poses.size() * 0.8 &&
+        dist_to_goal < adaptive_lookahead_distance_)
     {
         double reduction_factor = dist_to_goal / adaptive_lookahead_distance_;
         lookahead_dist *= reduction_factor;
@@ -441,27 +447,30 @@ void PurePursuitNode::controlCallback()
     }
 
     // ---- Curvature-based speed limit ----
-    // Scan ahead from the closest waypoint to find the tightest upcoming curve.
-    // This lets the robot brake BEFORE entering a corner, not while inside it.
-    const size_t curvature_window = 30;  // look ~30 waypoints ahead
-    size_t curv_end = std::min(closest_idx + curvature_window, reference_path_.poses.size() - 1);
-    double max_upcoming_curvature = 0.0;
-    for (size_t i = closest_idx; i < curv_end; ++i)
-    {
-        double k = computePathCurvature(i);
-        if (k > max_upcoming_curvature) max_upcoming_curvature = k;
-    }
-
-    // Limit speed so the required angular velocity (v * kappa) stays well within
-    // max_angular_velocity, leaving headroom for heading corrections.
-    // Also apply lateral-acceleration limit for comfort.
     double v_curvature_limit = max_linear_velocity_;
-    if (max_upcoming_curvature > 0.01)
+    double max_upcoming_curvature = 0.0;
+    if (enable_curvature_slowdown_)
     {
-        double v_omega_limit = (max_angular_velocity_ * 0.5) / max_upcoming_curvature;
-        double v_accel_limit = std::sqrt(max_lateral_acceleration_ / max_upcoming_curvature);
-        v_curvature_limit = std::min({v_omega_limit, v_accel_limit, max_linear_velocity_});
-        v_curvature_limit = std::max(v_curvature_limit, 0.05);
+        // Scan ahead from the closest waypoint to find the tightest upcoming curve.
+        // This lets the robot brake BEFORE entering a corner, not while inside it.
+        const size_t curvature_window = 30;  // look ~30 waypoints ahead
+        size_t curv_end = std::min(closest_idx + curvature_window, reference_path_.poses.size() - 1);
+        for (size_t i = closest_idx; i < curv_end; ++i)
+        {
+            double k = computePathCurvature(i);
+            if (k > max_upcoming_curvature) max_upcoming_curvature = k;
+        }
+
+        // Limit speed so the required angular velocity (v * kappa) stays well within
+        // max_angular_velocity, leaving headroom for heading corrections.
+        // Also apply lateral-acceleration limit for comfort.
+        if (max_upcoming_curvature > 0.01)
+        {
+            double v_omega_limit = (max_angular_velocity_ * 0.7) / max_upcoming_curvature;
+            double v_accel_limit = std::sqrt(max_lateral_acceleration_ / max_upcoming_curvature);
+            v_curvature_limit = std::min({v_omega_limit, v_accel_limit, max_linear_velocity_});
+            v_curvature_limit = std::max(v_curvature_limit, 0.05);
+        }
     }
 
     // ---- Speed reduction based on heading error ----
